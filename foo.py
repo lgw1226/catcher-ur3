@@ -1,7 +1,11 @@
-import os
+import numpy as np
 
 
-dirname = os.path.dirname(__file__)
-assets_dirname = os.path.join(dirname, 'assets')
+a = np.random.randn(5) * 5
+ub = np.ones(5)
+lb = -np.ones(5)
 
-print(assets_dirname)
+clip_a = np.clip(a, lb, ub)
+
+print(a)
+print(clip_a)
