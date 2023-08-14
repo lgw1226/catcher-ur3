@@ -41,11 +41,9 @@ class UR3Env(MujocoEnv, utils.EzPickle):
     # to check collision between objects in simulation, set to True
     ENABLE_COLLISION_CHECKER = False
 
-    ##### __init__ #####
+    ##### initilization #####
 
     def __init__(self):
-
-        ##### initialization #####
 
         # check collision by copying the simulation and stepping forward
         # collision checker is the part where the copy is generated
@@ -333,3 +331,5 @@ class UR3Env(MujocoEnv, utils.EzPickle):
             warnings.warn('Max iteration limit reached! err: %f (threshold: %f), null_obj_err: %f (threshold: %f)'%(err, threshold, null_obj_val, threshold_null), RuntimeWarning)
 
         return q, iter_taken, err, null_obj_val
+
+    ##### MujocoEnv related utility methods #####

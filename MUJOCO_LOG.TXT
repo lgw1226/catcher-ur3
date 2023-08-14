@@ -1,0 +1,18 @@
+Mon Aug 14 17:07:48 2023
+WARNING: mju_openResource: unknown file './assets/ur3/ur3_catch.xml'
+
+Mon Aug 14 17:23:48 2023
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0060.
+
+Mon Aug 14 17:37:12 2023
+WARNING: Nan, Inf or huge value in QVEL at DOF 12. The simulation is unstable. Time = 0.0060.
+
+Mon Aug 14 19:56:04 2023
+WARNING: mju_openResource: unknown file './assets/mjcf/dual_ur3_larr_right_arm.xml'
+
+Mon Aug 14 19:58:35 2023
+WARNING: mju_openResource: unknown file './assets/mjcf/dual_ur3_larr_right_hand.xml'
+
+Mon Aug 14 20:29:39 2023
+WARNING: mju_openResource: unknown file './assets/mjcf/ur3_catch_test.xml'
+
