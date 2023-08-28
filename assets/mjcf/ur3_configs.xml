@@ -15,6 +15,8 @@
     <!--Camera Light-->
     <visual>
         <headlight ambient="0.5 0.5 0.5" />
+        <rgba haze="0.15 0.25 0.35 1"/>
+        <global azimuth="120" elevation="-20"/>
     </visual>
 
     <!--Global Illumination-->
@@ -109,7 +111,7 @@
         <mesh file="ur3/robotiq_85_knuckle_link.stl" />
         
         <!--Objects-->
-        <mesh name="mug" file="objects/mug.stl" scale="0.0006 0.0006 0.0006"/>
+        <mesh name="cone_part" file="../meshes/ur3/cone_part.obj" scale=".8 .608 .8"/>
 
     </asset>
     
@@ -167,10 +169,12 @@
         <material shininess=".1" name="light_wood_v3" texture="light_wood_v3" specular="0.4"/>
 
         <texture name="grid" type="2d" builtin="checker" rgb1=".1 .2 .3" rgb2=".2 .3 .4" width="300" height="300"/>
-        <material name="grid" texture="grid" texrepeat="8 8" reflectance="0.05"/>
+        <material name="grid" texture="grid" texrepeat="4 4" reflectance="0.05"/>
 
         <texture builtin="gradient" height="256" rgb1=".9 .9 1." rgb2=".2 .3 .4" type="skybox" width="256"/>
-        <texture type="skybox" builtin="gradient" rgb1=".50 .495 .48" rgb2=".50 .495 .48" width="32" height="32"></texture>
+        <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
+
+        <material name="green" rgba="0.3 0.7 0.3 1"/>
 
     </asset>
 
