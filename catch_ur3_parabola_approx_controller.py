@@ -3,21 +3,70 @@ from collections import deque
 
 import numpy as np
 import torch
+import torch.nn as nn
 import torch.optim as optim
 
 from catch_ur3.envs.catch_ur3 import CatchUR3Env
 
 
-class PosSequence:
-    def __init__(self, maxlen=5):
-        self.maxlen = maxlen
-        self.buffer = deque(maxlen=maxlen)
+class DataBuffer:
+    
+    def __init__(self, data_size: list, maxlen=5):
 
-    def push(self, pos):
-        self.buffer.append(pos)
+        self.maxlen = maxlen
+        self.buffer = np.zeros([self.maxlen] + data_size)
+
+        self.idx = 0
+        self.full = False
+
+    def push(self, data):
+
+        self.buffer[self.idx] = data
+
+        self.idx = (self.idx + 1) % self.maxlen
+        self.full = self.full or self.idx == 0
 
     def get_data(self):
-        return np.array(self.buffer)
+        return torch.tensor(self.buffer)
+    
+
+class ParabolaModel(nn.Module):
+
+    def __init__(self):
+        super(ParabolaModel, self).__init__()
+
+        self.g = -9.81
+
+        self.fc_x = nn.Linear(1, 1, dtype=torch.float64)
+        self.fc_y = nn.Linear(1, 1, dtype=torch.float64)
+        self.fc_z = nn.Linear(1, 1, dtype=torch.float64)
+
+    def forward(self, t):
+
+        pred_x = self.fc_x(t)
+        pred_y = self.fc_y(t)
+        pred_z = self.fc_z(t) + 0.5 * self.g * t ** 2
+
+        return torch.cat((pred_x, pred_y, pred_z), dim=1)
+    
+    def fit(self, data, eps=0.001, max_iter=100):
+
+        self.optimizer = optim.SGD(self.parameters(), lr=1)
+        self.criterion = nn.MSELoss()
+
+        p = data[:,0:3]
+        t = data[:,3].unsqueeze(1)
+
+        for idx_iter in range(max_iter):
+            
+            self.optimizer.zero_grad()
+            pred_p = self.forward(t)
+            loss = self.criterion(pred_p, p)
+            self.optimizer.step()
+
+            if loss < eps: break
+
+        return loss
 
 
 def tidy_center_print(val='', terminal_width=80):
@@ -30,73 +79,37 @@ def tidy_key_val_print(key, val, terminal_width=80):
 
     print(f"{key}{val:>{leftover_width}.4f}")
 
-def estimate_trajectory(
-    pos_sequence,
-    p1=None,  # parameters for straignt line on xy-plane
-    p2=None,  # parameters for parabola on sz-plane
-    max_iter=100,
-    alpha=0.005,
-    eps=0.001
-):
-    
-    pos_sequence = torch.tensor(pos_sequence)
-    len_sequence = len(pos_sequence)
-
-    # fit a straight line on xy-plane
-    xy1 = torch.cat((pos_sequence[:,0:2], torch.ones(len_sequence, 1)), axis=1)
-
-    if not p1:  # if there's no initial guess
-        p1 = torch.randn(3, dtype=torch.float64, requires_grad=True)  # a_1 * x + a_2 * y + a_3 = 0
-    else:  # typecasting for input check
-        p1 = torch.tensor(p1, requires_grad=True)
-
-    loss_old = torch.zeros(1)
-
-    for _ in range(max_iter):
-
-        loss = torch.mean(torch.abs(xy1 @ p1) / torch.sqrt(p1[0] ** 2 + p1[1] ** 2))
-        print(loss)
-        if torch.abs(loss - loss_old) <= eps:
-            print('broken')
-            break
-        
-        loss.backward()
-        loss_old = loss
-
-        with torch.no_grad():
-            p1_new = p1 - alpha * p1.grad
-            p1 = p1_new.requires_grad_()
-
-    # projection of xy-points on the straight line
-    
-
-    # fit a parabola on sz-plane
-
 
 env = CatchUR3Env()
 
 num_episode = 1
-len_ball_pos_sequence = 5  # number of coordinates that make up a sequence
+len_ball_pos_sequence = 10  # number of coordinates that make up a sequence
 
 tidy_center_print('Info')
 tidy_key_val_print("Time elapsed between two consecutive simulation frames (sec)", env.dt)
 tidy_key_val_print("Number of coordinates used in computing parabolic trajectory (#)", len_ball_pos_sequence)
 tidy_center_print()
 
+model = ParabolaModel()
+
 for idx_episode in range(num_episode):
 
     obs, info = env.reset()
 
-    ball_pos_sequence = PosSequence()
-    ball_pos_sequence.push(copy(info['ball_pos']))
+    ball_pos_sequence = DataBuffer([4], maxlen=len_ball_pos_sequence)
+    ball_pos_sequence.push(np.append(info['ball_pos'], info['time']))
 
-    for idx_step in range(10):
+    for idx_step in range(30):
+        
         action = np.zeros(6)
         obs, reward, terminated, truncated, info = env.step(action)
-        ball_pos_sequence.push(copy(info['ball_pos']))
+
+        ball_pos_sequence.push(np.append(info['ball_pos'], info['time']))
 
         if idx_step >= len_ball_pos_sequence:
-            estimate_trajectory(ball_pos_sequence.get_data())
+
+            loss = model.fit(ball_pos_sequence.get_data())
+            print(loss)
  
 env.close()
 

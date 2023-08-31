@@ -239,7 +239,8 @@ class CatchUR3Env(MujocoEnv, EzPickle):
         info = {
             'ur3_qpos': ur3_qpos,
             'ur3_ee_pos_quat': self.ee_pos_quat(ur3_qpos),
-            'ball_pos': self.data.qpos[6:9]
+            'ball_pos': self.data.qpos[6:9],
+            'time': self.data.time
         }
 
         return info
@@ -312,7 +313,7 @@ class CatchUR3Env(MujocoEnv, EzPickle):
         return R[-1, :, :], p[-1, :], T[-1, :]
     
     def ee_pos_quat(self, q):
-        '''Return position and quaternion vectors of end-effector.'''
+        '''Return concatenated position and quaternion of end-effector'''
 
         rotation_matrix, translation_vector, _ = self.forward_kinematics_ee(q)
         rotation_matrix = Rotation.from_matrix(rotation_matrix)
