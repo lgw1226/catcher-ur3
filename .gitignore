@@ -1,3 +1,9 @@
+# UR3 log
+log/
+
+# etc
+etc/
+
 # cached files
 
 *.pyc
