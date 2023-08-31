@@ -435,7 +435,7 @@ end
                          q=None):
 
         """
-        Concatenate several move commands and applies a blending radius
+        Concatenate several move commands an applies a blending radius
         pose or q is a list of pose or joint-pose, and apply a force in a direction
 
         Parameters:

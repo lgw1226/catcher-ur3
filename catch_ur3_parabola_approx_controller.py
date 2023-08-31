@@ -41,6 +41,9 @@ class ParabolaModel(nn.Module):
         self.fc_y = nn.Linear(1, 1, dtype=torch.float64)
         self.fc_z = nn.Linear(1, 1, dtype=torch.float64)
 
+        self.optimizer = optim.SGD(self.parameters(), lr=0.05)
+        self.criterion = nn.L1Loss()
+
     def forward(self, t):
 
         pred_x = self.fc_x(t)
@@ -49,22 +52,24 @@ class ParabolaModel(nn.Module):
 
         return torch.cat((pred_x, pred_y, pred_z), dim=1)
     
-    def fit(self, data, eps=0.001, max_iter=100):
-
-        self.optimizer = optim.SGD(self.parameters(), lr=1)
-        self.criterion = nn.MSELoss()
+    def fit(self, data, eps=0.01, max_iter=200):
 
         p = data[:,0:3]
         t = data[:,3].unsqueeze(1)
 
         for idx_iter in range(max_iter):
-            
-            self.optimizer.zero_grad()
+
             pred_p = self.forward(t)
             loss = self.criterion(pred_p, p)
+            
+            self.optimizer.zero_grad()
+            loss.backward()
             self.optimizer.step()
 
-            if loss < eps: break
+            if torch.mean(loss) < eps:
+                break
+        
+        print(idx_iter + 1)
 
         return loss
 
@@ -83,16 +88,17 @@ def tidy_key_val_print(key, val, terminal_width=80):
 env = CatchUR3Env()
 
 num_episode = 1
-len_ball_pos_sequence = 10  # number of coordinates that make up a sequence
+len_ball_pos_sequence = 20  # number of coordinates that make up a sequence
 
 tidy_center_print('Info')
 tidy_key_val_print("Time elapsed between two consecutive simulation frames (sec)", env.dt)
 tidy_key_val_print("Number of coordinates used in computing parabolic trajectory (#)", len_ball_pos_sequence)
 tidy_center_print()
 
-model = ParabolaModel()
-
 for idx_episode in range(num_episode):
+
+    # create new model for each episode
+    model = ParabolaModel()
 
     obs, info = env.reset()
 
@@ -106,7 +112,7 @@ for idx_episode in range(num_episode):
 
         ball_pos_sequence.push(np.append(info['ball_pos'], info['time']))
 
-        if idx_step >= len_ball_pos_sequence:
+        if idx_step + 1 >= len_ball_pos_sequence:
 
             loss = model.fit(ball_pos_sequence.get_data())
             print(loss)

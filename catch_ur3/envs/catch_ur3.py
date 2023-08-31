@@ -13,7 +13,8 @@ from gymnasium.envs.mujoco import MujocoEnv
 class CatchUR3Env(MujocoEnv, EzPickle):
 
     metadata = {
-        'render_modes': ['human', 'rgb_array', 'depth_array']
+        'render_modes': ['human', 'rgb_array', 'depth_array'],
+        'render_fps': 50
     }
 
     ##### MujocoEnv class variables #####
@@ -51,7 +52,7 @@ class CatchUR3Env(MujocoEnv, EzPickle):
 
     low_bound = - high_bound
     
-    observation_space = gym.spaces.Box(low_bound, high_bound, (dim_obs,))
+    observation_space = gym.spaces.Box(low_bound, high_bound, (dim_obs,), dtype=np.float64)
 
     ##### action configuration #####
     
@@ -60,6 +61,9 @@ class CatchUR3Env(MujocoEnv, EzPickle):
 
     # enable collision checking if True
     ENABLE_COLLISION_CHECKER = False
+
+    # limit torque of each joint
+    ur3_torque_limit = np.array([50.0, 50.0, 25.0, 10.0, 10.0, 10.0])
 
     ##### initialization #####
 
@@ -138,7 +142,7 @@ class CatchUR3Env(MujocoEnv, EzPickle):
         self.kinematics_params['lb'] = np.array([-2*np.pi for _ in range(6)])
 
         # transition from world body to base link (right_arm_rotz)
-        rotz_idx = mujoco.mj_name2id(self.model, 1, 'right_arm_rotz')  # type: mjtObj
+        rotz_idx = mujoco.mj_name2id(self.model, 1, 'right_arm_rotz')
 
         self.kinematics_params['T'] = np.eye(4)
         self.kinematics_params['T'][0:3,0:3] = self.data.xmat[rotz_idx].reshape([3,3]).copy()
@@ -154,7 +158,7 @@ class CatchUR3Env(MujocoEnv, EzPickle):
 
         self.collision_env = self
 
-    def _is_collision(self, right_ur3_qpos):
+    def _is_collision(self, qpos):
         '''
         Check if there is collision with the given qpos of UR3 robot, return True if there is collision
         
@@ -209,9 +213,12 @@ class CatchUR3Env(MujocoEnv, EzPickle):
 
         return np.concatenate([qpos, qvel])
 
-    def step(self, ctrl):
+    def step(self, action):
 
-        self._step_mujoco_simulation(ctrl, self.mujoco_env_frame_skip)
+        # clip action according to joint torque limiet
+        action = np.clip(action, -self.ur3_torque_limit, self.ur3_torque_limit)
+
+        self._step_mujoco_simulation(action, self.mujoco_env_frame_skip)
 
         observation = self.get_obs()
         reward = self.get_reward()
@@ -251,10 +258,60 @@ class CatchUR3Env(MujocoEnv, EzPickle):
     
     def _get_reset_info(self):
 
-        info = self._get_info()
-
-        return info
+        return self._get_info()
     
+    ##### ur3 method #####
+
+    def servoj(self, q, a, v, t=0.008, lookahead_time=0.1, gain=300):
+        '''
+        from URScript API Reference v3.5.4
+
+            q: joint positions (rad)
+            a: NOT used in current version
+            v: NOT used in current version
+            t: time where the command is controlling the robot. The function is blocking for time t [S]
+            lookahead_time: time [S], range [0.03,0.2] smoothens the trajectory with this lookahead time
+            gain: proportional gain for following target position, range [100,2000]
+        '''
+
+        # check given joint coordinates have valid length (6)
+        assert q.shape[0] == self.ur3_nqpos
+        
+        current_q = self._get_ur3_qpos()
+        
+        # compute error and derivative of error
+        err = q - current_q
+        err_dot = - self._get_ur3_qvel()
+
+        # Internal forces
+        bias = self._get_ur3_bias()
+
+        # External forces
+        constraint = self._get_ur3_constraint()
+        constraint = np.clip(constraint, -self.ur3_torque_limit, self.ur3_torque_limit)
+
+        # apply PD control
+        gains = [gain, 5]  # PD gains
+        ctrl_PD = gains[0] * err + gains[1] * err_dot
+
+        return ctrl_PD + bias - constraint
+
+    def _get_ur3_qpos(self):
+
+        return self.data.qpos[:6]
+
+    def _get_ur3_qvel(self):
+        
+        return self.data.qvel[:6]
+
+    def _get_ur3_bias(self):
+
+        return self.data.qfrc_bias[:self.ur3_nqvel]
+
+    def _get_ur3_constraint(self):
+
+        return self.data.qfrc_constraint[0:self.ur3_nqvel]
+
     ##### utility method #####
 
     def forward_kinematics_DH(self, q):
