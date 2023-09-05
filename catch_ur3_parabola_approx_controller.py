@@ -85,6 +85,8 @@ def tidy_key_val_print(key, val, terminal_width=80):
     print(f"{key}{val:>{leftover_width}.4f}")
 
 
+device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+
 env = CatchUR3Env()
 
 num_episode = 1
